@@ -39,7 +39,7 @@ for new_parts, new_categories in scraper.get_parts(session):
     part_count += len(new_parts)
     categories_count += len(new_categories)
     session.commit()
-    
+
 print(f"Added { part_count } new parts and { categories_count } new categories to the database")
 
 # 6. Remove Parts older than 30 days from the database
