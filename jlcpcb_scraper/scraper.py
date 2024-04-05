@@ -3,6 +3,7 @@ import logging
 import time
 from datetime import datetime, timedelta
 from dataclasses import dataclass, field
+import concurrent.futures
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -63,6 +64,7 @@ class JlcpcbScraper:
         })
         self.token_expires = datetime.now() + timedelta(seconds=1800)
 
+
     def get_all_links(self):
         response = self.session.get(self.base_url+'/all-electronic-components')
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -70,7 +72,7 @@ class JlcpcbScraper:
             if '/parts/1st/' in link['href'] or '/parts/2nd/' in link['href']:
                 self.all_links.append(link['href'])
         logger.info('All links fetched')
-    
+
     def extract_categories(self, session, response):
         new_categories = []
         for component in response.get('data', {}).get('componentInfos', []):
@@ -85,87 +87,89 @@ class JlcpcbScraper:
         yield [], new_categories
 
     def get_parts(self, session):
-        # first query
-        response = self.session.post('https://jlcpcb.com/external/component/getComponentInfos')
-        if response.status_code != 200:
-            logger.error(f"Cannot obtain parts {response.json()}")
-            raise RuntimeError(f"Cannot obtain parts {response.json()}")
-        response = response.json()
-        if not response.get("code") == 200:
-            logger.error(f"Cannot obtain parts {response}")
-            raise RuntimeError(f"Cannot obtain parts {response}")
-        if not response.get('data', {}).get('componentInfos', []):
-            yield None, None
-            return
-        yield from self.extract_categories(session, response)
-        self.parse_pagination(response)
-        yield from self.parse_parts(session, response)
-        # subsequent page queries
-        request_count = 1
-        while response['data']['componentInfos']:
-            time.sleep(0.2)
-            logger.info(f'Fetching page {request_count}')
-            request_count + 1
-            response = self.session.post('https://jlcpcb.com/external/component/getComponentInfos', data={"lastKey": self.last_key})
-            if response.status_code != 200:
-                logger.error(f"Cannot obtain parts, status code not 200: {response}")
-                yield None, None
-                return
-            response = response.json()
-            if not response.get("code") == 200:
-                logger.error(f"Cannot obtain parts, internal status code not 200: {response}")
-                yield None, None
-                return
-            if response.get('data', {}).get('componentInfos', []) is None:
-                yield None, None
-                logger.info('No more parts to fetch')
-            yield from self.extract_categories(session, response)
-            self.parse_pagination(response)
-            yield from self.parse_parts(session, response)
-            if self.token_expires < datetime.now():
-                self._obtain_token()
-
-    def parse_parts(self, session, response):
-        parts = response['data']['componentInfos']
-        all_categories = []
+        # Modified to use ThreadPoolExecutor for parallel requests
+        parts_fetched = True
+        last_key = None
         all_parts = []
-        for part in parts:
-            if  part['stock'] == 0:
-                continue
-            part_subcategory = part['secondCategory']
-            if not self.category_exists(part_subcategory):
-                new_category = Category(name=part['firstCategory'], subcategory_name=part_subcategory)
+        all_categories = []
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1000) as executor:
+            future_to_url = {}
+            while parts_fetched:
+                if self.token_expires < datetime.now():
+                    self._obtain_token()
+
+                url = 'https://jlcpcb.com/external/component/getComponentInfos'
+                data = {"lastKey": last_key} if last_key else None
+                future = executor.submit(self.session.post, url, data=data)
+                future_to_url[future] = url
+
+                for future in concurrent.futures.as_completed(future_to_url):
+                    response = future.result().json()
+                    if response.get("code") == 200 and response.get('data', {}).get('componentInfos', []):
+                        # Process your components here
+                        parts, categories = self.extract_and_process_components(session, response)
+                        all_parts.extend(parts)
+                        all_categories.extend(categories)
+                        last_key = response.get('data', {}).get('lastKey', None)
+                        parts_fetched = bool(parts)
+                        print(f"Length of parts: {len(parts)}, Length of all_parts: {len(all_parts)}")
+                    else:
+                        parts_fetched = False
+
+                if not parts_fetched:
+                    break  # Break the loop if no more parts are fetched
+
+    def extract_and_process_components(self, session, response):
+        new_categories = []
+        new_parts = []
+
+        # Process categories
+        for component in response.get('data', {}).get('componentInfos', []):
+            category_name = component.get('firstCategory')
+            subcategory_name = component.get('secondCategory')
+            if not self.category_exists(subcategory_name):
+                new_category = Category(name=category_name, subcategory_name=subcategory_name)
                 category = create_or_update_category(session, new_category)
                 if category not in self.categories:
-                    all_categories.append(new_category)
+                    new_categories.append(new_category)
                     self.categories.append(new_category)
-            subcategory_id = self.get_category(part_subcategory).id
-            part_price = self.get_part_price(part['price'])
-            part_instance = Part(
-                lcsc=part['lcscPart'],
-                category_id=subcategory_id,
-                mfr=part['mfrPart'],
-                package=part['package'],
-                joints=int(part['solderJoint']),
-                manufacturer=part['manufacturer'],
-                basic=part['libraryType'] == 'base',
-                description=part['description'],
-                datasheet=part['datasheet'],
-                stock=int(part['stock']),
-                price=part_price,
-                last_update=datetime.now()  # Replace with the actual value based on your logic
-            )
-            all_parts.append(part_instance)
-            create_or_update_part(session, part_instance)
 
-        # Add parts to subcategories
-        yield all_parts, all_categories
+        # Process parts
+        for part_data in response.get('data', {}).get('componentInfos', []):
+            if part_data['stock'] == 0:
+                continue
+            part_subcategory_name = part_data['secondCategory']
+            category = self.get_category(part_subcategory_name)
+            if category is None:
+                logger.error(f"Category not found for subcategory: {part_subcategory_name}")
+                continue
+            part_price = self.get_part_price(part_data['price'])
+            new_part = Part(
+                lcsc=part_data['lcscPart'],
+                category_id=category.id,  # Assuming 'category' has an 'id' attribute
+                mfr=part_data['mfrPart'],
+                package=part_data['package'],
+                joints=int(part_data['solderJoint']),
+                manufacturer=part_data['manufacturer'],
+                basic=part_data['libraryType'] == 'base',
+                description=part_data['description'],
+                datasheet=part_data['datasheet'],
+                stock=int(part_data['stock']),
+                price=part_price,
+                last_update=datetime.now()  # Replace with the actual logic if needed
+            )
+            new_parts.append(new_part)
+            create_or_update_part(session, new_part)  # Assuming this function handles DB insertion or update
+
+        return new_parts, new_categories
+
 
     def parse_pagination(self, response):
         self.last_key = response.get('data', {}).get('lastKey', None)
         if not self.last_key:
             raise RuntimeError("Cannot obtain last key")
-        
+
     def get_part_price(self, price: str) -> float | None:
         '''
         string input example: "'20-180:0.004285714,200-780:0.003485714,1600-9580:0.002771429,800-1580:0.003042857,9600-19980:0.002542857,20000-:0.002414286'"
@@ -180,13 +184,13 @@ class JlcpcbScraper:
         except Exception as e:
             logger.error(f'Error parsing price: {e}')
             return None
-    
+
     def category_exists(self, subcategory_name: str) -> bool:
         return any([category.subcategory_name == subcategory_name for category in self.categories])
-    
+
     def get_category(self, subcategory_name: str) -> Category | None:
         return next((category for category in self.categories if category.subcategory_name == subcategory_name), None)
-    
+
     def get_category_by_id(self, category_id: int) -> Category | None:
         return next((category for category in self.categories if category.id == category_id), None)
 

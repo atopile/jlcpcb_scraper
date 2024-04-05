@@ -50,21 +50,45 @@ for part in old_parts:
 session.commit()
 print(f"Removed { len(old_parts) } old parts from the database")
 
-# 7. Iterate over all parts with a chuncked cursor
+# 7. Iterate over all parts with a threadpool
+from concurrent.futures import ThreadPoolExecutor
+import math
+
+def process_parts_chunk(parts_chunk):
+    print(f"Processing a chunk of {len(parts_chunk)} parts")
+    local_session = Session()
+    try:
+        for part in parts_chunk:
+            # Merge the part instance into the local session
+            local_part = local_session.merge(part)
+            local_part.resistance = resistance.parse_resistance_description(local_part.description)
+            local_part.capacitance = capacitance.parse_capacitance_description(local_part.description)
+            local_part.inductance = inductance.parse_inductance_description(local_part.description)
+            local_part.voltage = voltage.parse_voltage_description(local_part.description)
+            local_part.current = current.parse_current_description(local_part.description)
+            local_part.dielectric = dielectric.parse_dielectric_description(local_part.description)
+            local_session.add(local_part)
+        local_session.commit()
+    except Exception as e:
+        print(f"Error processing chunk: {e}")
+    finally:
+        local_session.close()
+
 print("Parsing part descriptions")
-for part in session.query(Part).yield_per(1000):
-    # 8. Parse the description and update the part with the parsed values
-    part.resistance = resistance.parse_resistance_description(part.description)
-    part.capacitance = capacitance.parse_capacitance_description(part.description)
-    part.inductance = inductance.parse_inductance_description(part.description)
-    part.voltage = voltage.parse_voltage_description(part.description)
-    part.current = current.parse_current_description(part.description)
-    part.dielectric = dielectric.parse_dielectric_description(part.description)
-    session.add(part)
-session.commit()
+total_parts = session.query(Part).count()
+chunks = math.ceil(total_parts / 100)
+parts_per_chunk = math.ceil(total_parts / chunks)
+
+with ThreadPoolExecutor(max_workers=100) as executor:
+    for i in range(chunks):
+        offset = i * parts_per_chunk
+        # Temporarily disable autoflush
+        session.autoflush = False
+        parts_chunk = session.query(Part).offset(offset).limit(parts_per_chunk).all()
+        # Re-enable autoflush
+        session.autoflush = True
+        executor.submit(process_parts_chunk, parts_chunk)
+
 print("Parsed part descriptions")
 
-
-# Save changes to the database
-session.commit()
 session.close()
