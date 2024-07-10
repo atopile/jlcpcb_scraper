@@ -1,3 +1,4 @@
+import re
 from functools import partial
 
 _multipliers = {
@@ -46,20 +47,9 @@ voltage = partial(_parse, "V")
 
 def dielectric(description: str) -> str | None:
     """Parse the dielectric from a component description"""
-    dielectric_value = None
-    if description is None:
-        return dielectric_value
-
-    if "C0G" in description:
-        dielectric_value = "C0G"
-    elif "X7R" in description:
-        dielectric_value = "X7R"
-    elif "X5R" in description:
-        dielectric_value = "X5R"
-    elif "Y5V" in description:
-        dielectric_value = "Y5V"
-
-    return dielectric_value
+    dielectric_code = re.compile(r"\b[XYZ][4-9][PRLSTUV]\b")
+    dielectric_value = dielectric_code.search(description)
+    return dielectric_value.group() if dielectric_value else None
 
 def percent(description: str | None) -> float | None:
     """Parse the percentage from a component description"""

@@ -1,79 +1,75 @@
-from sqlalchemy import Column, Integer, String, Boolean, Float, DateTime, ForeignKey
-from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.orm import relationship, Session
-from sqlalchemy.ext.declarative import declarative_base
 import datetime
+import operator
+
+from sqlalchemy import Column, DateTime, Float, Integer, String
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.orm import Mapped, Session, declarative_base
 
 Base = declarative_base()
 
+
+def in_(x: Column, y):
+    return x.in_(y)
+
+
 class Part(Base):
-    __tablename__ = 'parts'
+    """Abstract base of a part."""
+    __abstract__ = True
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    lcsc = Column(String, index=True, unique=True)
-    category_id = Column(Integer, ForeignKey('categories.id'))
-    mfr = Column(String)
-    package = Column(String)
-    joints = Column(Integer)
-    manufacturer = Column(String)
-    basic = Column(Boolean)
-    description = Column(String)
-    datasheet = Column(String)
-    stock = Column(Integer)
-    price = Column(Float)
-    last_update = Column(DateTime, default=datetime.datetime.utcnow)
-    resistance = Column(Float, nullable=True, index=True)
-    inductance = Column(Float, nullable=True, index=True)
-    capacitance = Column(Float, nullable=True, index=True)
-    dielectric = Column(String, nullable=True, index=True)
-    current = Column(Float, nullable=True, index=True)
-    voltage = Column(Float, nullable=True, index=True)
+    # Normal fields
+    id = Column(Integer, primary_key=True)
+    last_update = Column(DateTime, default=datetime.datetime.now(datetime.UTC))
 
-def create_or_update_part(session: Session, part: Part):
-    stmt = insert(Part).values(
-        lcsc=part.lcsc,
-        category_id=part.category_id,
-        mfr=part.mfr,
-        package=part.package,
-        joints=part.joints,
-        manufacturer=part.manufacturer,
-        basic=part.basic,
-        description=part.description,
-        datasheet=part.datasheet,
-        stock=part.stock,
-        price=part.price,
-        last_update=part.last_update
-    ).on_conflict_do_update(
-        index_elements=['lcsc'],
+    # Things we need to commonly update
+    price                 : Mapped[float] = Column(Float)
+    stock                 : Mapped[int] = Column(Integer)
+    overhead_cost         : Mapped[float] = Column(Float)  # The cost of the setup, handling and shipping etc... as overhead of using this SKU
+    rating                : Mapped[str] = Column(Integer)  # Rating is a magic number representing stock, basic part status and cost. The higher the better.
+
+    lcsc_id               : Mapped[str]   = Column(String, info={"return": True}, unique=True)
+    mpn                   : Mapped[str]   = Column(String, info={"return": True, "query_operator": in_})
+
+    package               : Mapped[str]   = Column(String, info={"return": True, "query_operator": in_}, nullable=True)
+    footprint_name        : Mapped[str]   = Column(String, info={"return": True})
+
+
+class Resistor(Part):
+    """A model for a resistor part."""
+    __tablename__ = "resistors"
+
+    resistance_ohms_min       : Mapped[float] = Column(Float,  info={"return": True, "query_operator": operator.gt}, nullable=True)
+    resistance_ohms_max       : Mapped[float] = Column(Float,  info={"return": True, "query_operator": operator.lt}, nullable=True)
+    rated_power_watts         : Mapped[float] = Column(Float,  info={"return": True, "query_operator": operator.gt}, nullable=True)
+    operating_temp_celsius_min: Mapped[float] = Column(Float,  info={"return": True, "query_operator": operator.lt}, nullable=True)
+    operating_temp_celsius_max: Mapped[float] = Column(Float,  info={"return": True, "query_operator": operator.gt}, nullable=True)
+
+
+class Capacitor(Part):
+    """A model for a capacitor part."""
+    __tablename__ = "capacitors"
+
+    capacitance_farads_min: Mapped[float] = Column(Float,  info={"return": True, "query_operator": operator.gt}, nullable=True)
+    capacitance_farads_max: Mapped[float] = Column(Float,  info={"return": True, "query_operator": operator.lt}, nullable=True)
+    rated_voltage_volts   : Mapped[float] = Column(Float,  info={"return": True, "query_operator": operator.gt}, nullable=True)
+
+    # Dielectric type information: rated temperature range and temperature variation
+    # https://blog.knowlescapacitors.com/blog/simplify-capacitor-dielectric-selection-by-understanding-dielectric-coding-methods
+    operating_temp_celsius_min: Mapped[float] = Column(Float,  info={"return": True, "query_operator": operator.lt}, nullable=True)
+    operating_temp_celsius_max: Mapped[float] = Column(Float,  info={"return": True, "query_operator": operator.gt}, nullable=True)
+    # TODO: figure out how we can encode tolerance based on temperature variation
+    dielectric_code      : Mapped[str] = Column(String)
+
+
+def create_or_update_part(session: Session, comp: Part) -> Part:
+    d = {k: v for k, v in comp.__dict__.items() if k in comp.__table__.columns.keys() and k != 'id'}
+    stmt = insert(comp.__class__).values(**d).on_conflict_do_update(
+        index_elements=['lcsc_id'],
         set_={
-            'price': part.price,
-            'stock': part.stock,
-            'last_update': part.last_update
+            'price': comp.price,
+            'stock': comp.stock,
+            'last_update': comp.last_update
         }
     )
 
     session.execute(stmt)
-    return part
-
-
-class Category(Base):
-    __tablename__ = 'categories'
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String)
-    subcategory_name = Column(String)
-    parts = relationship('Part', backref='category')
-
-    @property
-    def component_count(self):
-        return sum([subclass.component_count for subclass in self.subclasses])
-    
-def create_or_update_category(session: Session, category: Category):
-    existing_category = session.query(Category).filter_by(name=category.subcategory_name).first()
-    if existing_category:
-        existing_category.subcategory_name = category.subcategory_name
-        return existing_category
-    else:
-        category.id = session.add(category)
-        session.commit()
-        return category
+    return comp
