@@ -1,3 +1,3 @@
 # Import all the models, so that Base has them before being
 # imported by Alembic
-from config.models import *
+from component_server.models import *

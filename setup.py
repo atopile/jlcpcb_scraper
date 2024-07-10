@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='jlcpcb_scraper',
+    name='component_server',
     version='0.1',
     packages=find_packages(),
     install_requires=[
@@ -9,7 +9,7 @@ setup(
         'beautifulsoup4',
     ],
     entry_points={},
-    url='https://github.com/yourusername/jlcpcb_scraper',
+    url='https://github.com/atopile/component-server',
     license='MIT',
     author='Your Name',
     author_email='your.email@example.com',

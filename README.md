@@ -92,3 +92,10 @@ To list the tables, invoke `\dt`. To quit, invoke `exit`. To delete tables we ar
 
 1. Run `docker-compose up` to start PostgreSQL.
 2. Run `fastapi dev endpoints.py` to start the FastAPI server.
+
+
+## Up-revving database
+
+1. Upgrade the schema
+2. Create a revision `alembic revision --autogenerate -m "Why?"`
+3. Run the upgrade on the `alembic upgrade head`

@@ -6,8 +6,8 @@ import datetime
 import logging
 from typing import Type, TypeVar
 
-from src import parsers
-from src.models import Capacitor, Part, Resistor
+from component_server import parsers
+from component_server.models import Capacitor, Part, Resistor
 
 T = TypeVar("T", bound="AbstractModelFactory")
 

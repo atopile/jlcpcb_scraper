@@ -1,6 +1,6 @@
 
 def test_voltage():
-    from src.parsers import voltage
+    from component_server.parsers import voltage
     assert voltage("10V") == 10
     assert voltage("10V 20V") == 10
     assert voltage("20V 10V") == 20
@@ -8,7 +8,7 @@ def test_voltage():
 
 
 def test_dielectric():
-    from src.parsers import dielectric
+    from component_server.parsers import dielectric
     assert dielectric("asdasd asdas X5P") == "X5P"
     assert dielectric("12312kjnkj123 X7R") == "X7R"
     assert dielectric("X7R 10%") == "X7R"

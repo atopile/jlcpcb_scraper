@@ -8,8 +8,8 @@ from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel, create_model
 from sqlalchemy.orm import DeclarativeBase, Query, Session
 
-from src import models
-from src.session import SessionLocal
+from component_server import models
+from component_server.session import SessionLocal
 
 app = FastAPI()
 
@@ -52,7 +52,7 @@ def _create_pydantic_response_model(model: Type[DeclarativeBase]) -> BaseModel:
     for column in sqlalchemy.inspection.inspect(model).columns:
         if not column.info.get("return", False):
             continue
-        columns[column.name] = (column.type.python_type, None)  # No default
+        columns[column.name] = (Optional[column.type.python_type], None)  # No default
 
     return create_model(model.__name__, **columns, __config__={"from_attributes": True})
 
@@ -151,6 +151,29 @@ async def get_resistor_diagnostic(
 # #####################
 # # Capacitor endpoint
 # #####################
+
+CapacitorRequest = _create_pydantic_request_model(models.Capacitor)
+CapacitorResponse = _create_pydantic_response_model(models.Capacitor)
+
+
+@app.post("/v2/find/capacitor", response_model=CapacitorResponse)
+async def get_capacitor(request: CapacitorRequest, db: Session = Depends(get_db)):
+    """
+    Get a capacitor based on the capacitor specs.
+    If is a spec is omitted, it will allow any value for that spec in the search.
+    """
+    return _find_component(models.Capacitor, request, db)
+
+
+@app.post("/v2/find/diagnose/capacitor", response_model=DiagnosticReport)
+async def get_capacitor_diagnostic(
+    request: CapacitorRequest, db: Session = Depends(get_db)
+):
+    """
+    Get a diagnostics report on a capacitor search.
+    """
+    return _do_diag(models.Capacitor, request, db)
+
 
 
 # def capacitor_capacitance_filter(query: Query, api_data: api_schema.Capacitor):
