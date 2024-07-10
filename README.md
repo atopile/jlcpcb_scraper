@@ -65,3 +65,30 @@ from jlcpcb_scraper.models import Base
 engine = create_engine(config.SQLALCHEMY_DATABASE_URI)
 Base.metadata.create_all(engine)
 ```
+
+## Local developement
+
+### Running a local postgreSQL database
+
+Make sure docker is running and run `docker-compose up`.
+
+### Updating the alembic database schema
+
+If you change the database schema, use the following command to update the alembic version and migration script: `alembic revision --autogenerate -m "explain what happened"`
+
+To apply the changes to the database, run `alembic upgrade head`. Your database should now follow the alchemy ORM schema.
+
+### Inspecting your database
+
+To inspect the contents of your database and make changes manually, use the `psql` util. `psql` can be installed with `brew` on mac with `brew install postgresql@16`.
+
+```bash
+psql -U atopile -h localhost -p 5432 -d atopile-components
+```
+
+To list the tables, invoke `\dt`. To quit, invoke `exit`. To delete tables we are not using anymore, invoke `DROP TABLE public.alembic_version, public.ranged_values;
+
+### Starting the server
+
+1. Run `docker-compose up` to start PostgreSQL.
+2. Run `fastapi dev endpoints.py` to start the FastAPI server.

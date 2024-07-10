@@ -5,8 +5,8 @@ from sqlalchemy import pool
 
 from alembic import context
 
-from jlcpcb_scraper.config import config as app_config
-from jlcpcb_scraper.base import *
+from src.config import config as app_config
+from src.base import *
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

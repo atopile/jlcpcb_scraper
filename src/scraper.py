@@ -19,10 +19,10 @@ from sqlalchemy.orm import sessionmaker
 
 import alembic.config
 from alembic import command
-from jlcpcb_scraper.config import config
-from jlcpcb_scraper.factory import process
-from jlcpcb_scraper.models import Part, create_or_update_part
-from jlcpcb_scraper.scraper import JlcpcbScraper
+from src.config import config
+from src.factory import process
+from src.models import Part, create_or_update_part
+from src.jlcpcb_scraper import JlcpcbScraper
 
 
 # %%

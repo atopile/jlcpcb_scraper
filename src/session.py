@@ -1,9 +1,7 @@
-import json
-
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from config import config
+from src.config import config
 
 if "postgresql" in config.SQLALCHEMY_DATABASE_URI:
     engine = create_engine(

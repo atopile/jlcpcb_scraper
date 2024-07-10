@@ -6,8 +6,8 @@ import datetime
 import logging
 from typing import Type, TypeVar
 
-from jlcpcb_scraper import parsers
-from jlcpcb_scraper.models import Capacitor, Part, Resistor
+from src import parsers
+from src.models import Capacitor, Part, Resistor
 
 T = TypeVar("T", bound="AbstractModelFactory")
 

@@ -8,11 +8,7 @@ setup(
         'requests',
         'beautifulsoup4',
     ],
-    entry_points={
-        'console_scripts': [
-            'jlcpcb_scraper = jlcpcb_scraper.scraper:main',
-        ],
-    },
+    entry_points={},
     url='https://github.com/yourusername/jlcpcb_scraper',
     license='MIT',
     author='Your Name',
