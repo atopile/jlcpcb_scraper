@@ -115,7 +115,10 @@ class ResistorFactory(AbstractModelFactory):
 
     @classmethod
     def for_me(cls, data: dict) -> bool:
-        return data.get("firstCategory") == "Resistors"
+        return (
+            data.get("firstCategory") == "Resistors" and
+            data.get("secondCategory") == "Chip Resistor - Surface Mount"
+        )
 
     async def build(self, data: dict) -> Resistor | None:
         nominal_resistance = parsers.resistance(data.get("description"))
@@ -183,7 +186,10 @@ class CapacitorFactory(AbstractModelFactory):
 
     @classmethod
     def for_me(cls, data: dict) -> bool:
-        return data.get("firstCategory") == "Capacitors"
+        return (
+            data.get("firstCategory") == "Capacitors" and
+            data.get("secondCategory") == "Multilayer Ceramic Capacitors MLCC - SMD/SMT"
+        )
 
     async def build(self, data: dict) -> Capacitor | None:
         nominal_capacitance = parsers.capacitance(data.get("description"))
@@ -231,7 +237,7 @@ CapacitorFactory.register()
 async def process(data: dict) -> Part | None:
     for factory in AbstractModelFactory.factories:
         if factory.for_me(data):
-            log.debug(
+            log.info(
                 "%s accepted data in category %s-%s",
                 factory.__class__.__name__,
                 data.get("firstCategory"),
@@ -240,9 +246,9 @@ async def process(data: dict) -> Part | None:
 
             component = await factory().build(data)
             if component:
-                log.debug("Built %s", component)
+                log.info("Built %s", component)
             else:
-                log.debug("Rejected")
+                log.info("Rejected")
 
             # Always return after the first factory that accepts the data
             return component

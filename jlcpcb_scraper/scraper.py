@@ -1,15 +1,14 @@
-import os
 import logging
+import os
 import time
 from datetime import datetime, timedelta
-
-import requests
-from requests.adapters import HTTPAdapter
-from fake_useragent import UserAgent
 from typing import Generator
 
+import requests
+from fake_useragent import UserAgent
+from requests.adapters import HTTPAdapter
 
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 
 JLCPCB_KEY = os.environ.get("JLCPCB_KEY")
@@ -46,7 +45,7 @@ class JlcpcbScraper:
         self._obtain_token()
 
         # Wew!
-        logger.info("JlcpcbScraper initialized")
+        log.info("JlcpcbScraper initialized")
 
     def _obtain_token(self) -> None:
         if not self.key or not self.secret:
@@ -81,26 +80,27 @@ class JlcpcbScraper:
     def get_parts(self) -> Generator[dict, None, None]:
         request_count = 0
         while True:
-            logger.info("Fetching page %s", request_count)
+            log.info("Fetching page %s", request_count)
             request_count += 1
             response = self.session.post(
                 "https://jlcpcb.com/external/component/getComponentInfos",
                 data={"lastKey": self.last_key} if self.last_key else None,
+                timeout=10,
             )
             if response.status_code != 200:
-                logger.error("Cannot obtain parts, status code not 200: %s", response)
+                log.error("Cannot obtain parts, status code not 200: %s", response)
                 return
 
             response_data: dict = response.json()
             if not response_data.get("code") == 200:
-                logger.error(
+                log.error(
                     "Cannot obtain parts, internal status code not 200: %s",
                     response_data,
                 )
                 return
 
             if not response_data.get("data", {}).get("componentInfos"):
-                logger.info("No more parts to fetch")
+                log.info("No more parts to fetch")
                 return
 
             self._parse_pagination(response_data)

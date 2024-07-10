@@ -12,12 +12,13 @@ _multipliers = {
     "M": 1000_000.0,
 }
 
+
 def _parse(unit: str, description: str) -> float | None:
     """Parse the capacitance from a component description"""
     if description is None:
         return None
 
-    for part in description.split(' '):
+    for part in description.split(" "):
         if len(part) < 2:
             continue
 
@@ -38,6 +39,7 @@ def _parse(unit: str, description: str) -> float | None:
         except ValueError:
             pass
 
+
 capacitance = partial(_parse, "F")
 resistance = partial(_parse, "Ω")
 inductance = partial(_parse, "H")
@@ -45,18 +47,20 @@ power = partial(_parse, "W")
 current = partial(_parse, "A")
 voltage = partial(_parse, "V")
 
+
 def dielectric(description: str) -> str | None:
     """Parse the dielectric from a component description"""
     dielectric_code = re.compile(r"\b[XYZ][4-9][PRLSTUV]\b")
     dielectric_value = dielectric_code.search(description)
     return dielectric_value.group() if dielectric_value else None
 
+
 def percent(description: str | None) -> float | None:
     """Parse the percentage from a component description"""
     if description is None:
         return None
 
-    for fragment in description.split(' '):
+    for fragment in description.split(" "):
         if fragment.endswith("%"):
             while not fragment[0].isdigit():
                 fragment = fragment[1:]
@@ -64,6 +68,7 @@ def percent(description: str | None) -> float | None:
                 return float(fragment[:-1])
             except ValueError:
                 pass
+
 
 def price(price_description: str) -> float | None:
     """
