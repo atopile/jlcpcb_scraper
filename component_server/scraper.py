@@ -12,6 +12,7 @@ else:
 
 import asyncio
 import logging
+import pathlib
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import create_engine
@@ -21,9 +22,8 @@ import alembic.config
 from alembic import command
 from component_server.config import config
 from component_server.factory import process
-from component_server.models import Part, create_or_update_part
 from component_server.jlcpcb_scraper import JlcpcbScraper
-
+from component_server.models import Part, create_or_update_part
 
 # %%
 # 1. Manage db schema with alembic
@@ -43,10 +43,22 @@ session = Session()
 
 
 # %%
-# 3. Initialize JLCPCB scraper with the current category models
+# 3. Brrrr...
+categories = set()
+categories_path = pathlib.Path("categories.txt")
+categories_path.unlink(missing_ok=True)
+categories_path.touch()
+
 scraper = JlcpcbScraper(config.JLCPCB_KEY, config.JLCPCB_SECRET)
 for i, part_data in enumerate(scraper.get_parts()):
     log.debug("Processing part %s", i)
+    # Dump the categories to a file for reference
+    category = (part_data["firstCategory"], part_data["secondCategory"])
+    if category not in categories:
+        categories.add(category)
+        log.info("Adding category %s", category)
+        with categories_path.open("a") as f:
+            f.write(f"{category}\n")
 
     if part := asyncio.run(process(part_data)):
         log.debug("Part %s accepted", i)

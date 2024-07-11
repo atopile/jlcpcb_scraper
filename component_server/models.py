@@ -65,6 +65,23 @@ class Capacitor(Part):
     dielectric_code: Mapped[str] = Column(String)
 
 
+class Inductor(Part):
+    """A model for a inductor part."""
+    __tablename__ = "inductor"
+
+    inductance_henries_min: Mapped[float] = Column(Float, info={"return": True, "query_operator": operator.gt}, nullable=True)
+    inductance_henries_max: Mapped[float] = Column(Float, info={"return": True, "query_operator": operator.lt}, nullable=True)
+
+    dc_resistance_min: Mapped[float] = Column(Float, info={"return": True, "query_operator": operator.gt}, nullable=True)
+    dc_resistance_max: Mapped[float] = Column(Float, info={"return": True, "query_operator": operator.lt}, nullable=True)
+
+    operating_current_amps_min: Mapped[float] = Column(Float, info={"return": True, "query_operator": operator.gt}, nullable=True)
+    operating_current_amps_max: Mapped[float] = Column(Float, info={"return": True, "query_operator": operator.lt}, nullable=True)
+
+    operating_temp_celsius_min: Mapped[float] = Column(Float, info={"return": True, "query_operator": operator.gt}, nullable=True)
+    operating_temp_celsius_max: Mapped[float] = Column(Float, info={"return": True, "query_operator": operator.lt}, nullable=True)
+
+
 def create_or_update_part(session: Session, comp: Part) -> Part:
     d = {k: v for k, v in comp.__dict__.items() if k in comp.__table__.columns.keys() and k != 'id'}
     stmt = insert(comp.__class__).values(**d).on_conflict_do_update(
