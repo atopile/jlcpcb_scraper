@@ -202,6 +202,37 @@ async def get_inductors_diagnostic(
     return _do_diag(models.Inductor, request, db)
 
 
+# #####################
+# # Inductor endpoint
+# #####################
+
+MosfetRequest = _create_pydantic_request_model(models.Mosfet)
+MosfetResponse = _create_pydantic_response_model(models.Mosfet)
+
+
+@app.post("/v2/find/mosfet", response_model=MosfetResponse)
+async def get_mosfet(request: MosfetRequest, db: Session = Depends(get_db)):
+    """
+    Get a mosfet based on the mosfet specs.
+    If is a spec is omitted, it will allow any value for that spec in the search.
+    """
+    return _find_component(models.Mosfet, request, db)
+
+
+@app.post("/v2/find/diagnose/mosfet", response_model=DiagnosticReport)
+async def get_mosfet_diagnostic(
+    request: MosfetRequest, db: Session = Depends(get_db)
+):
+    """
+    Get a diagnostics report on a mosfet search.
+    """
+    return _do_diag(models.Mosfet, request, db)
+
+
+# #####################
+# # Main
+# #####################
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

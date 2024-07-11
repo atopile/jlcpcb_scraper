@@ -55,6 +55,27 @@ def dielectric(description: str) -> str | None:
     return dielectric_value.group() if dielectric_value else None
 
 
+def mosfet_switching_specs(description: str) -> tuple[float, float, float] | tuple[None, None, None]:
+    """
+    Parse the switching specification from a component description
+    eg. 2Ω@10V,450mA
+    """
+    try:
+        resistance_str, testpoint_str = description.split("@")
+        voltage_str, current_str = testpoint_str.split(",")
+    except ValueError:
+        # In case we can't split the string properly
+        return None, None, None
+
+    if resistance_float := resistance(resistance_str):
+        if voltage_float := voltage(voltage_str):
+            if current_float := current(current_str):
+                return resistance_float, voltage_float, current_float
+
+    return None, None, None
+    # if we don't get ALL the values, return None
+
+
 def percent(description: str | None) -> float | None:
     """Parse the percentage from a component description"""
     if description is None:
